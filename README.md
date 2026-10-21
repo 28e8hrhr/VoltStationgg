@@ -49,8 +49,9 @@ flowchart LR
 - **ESP32 (Wokwi):** lê os sensores, decide a fonte de energia e liga o carregador.
 - **Dashboard web:** mostra os dados em gráficos.
 
-![Circuito no Wokwi](./docs/img/circuito-wokwi.png)
-![Dashboard](./docs/img/dashboard.png)
+<img width="684" height="555" alt="Captura de tela 2026-10-20 231026" src="https://github.com/user-attachments/assets/90e6b368-733a-4467-b379-be56212275a0" />
+<img width="1397" height="923" alt="image" src="https://github.com/user-attachments/assets/eee15c56-a9ce-410c-9b3e-0b362e220436" />
+
 
 ---
 
