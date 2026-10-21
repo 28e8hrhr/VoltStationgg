@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "author": "Equipe VoltStation - FIAP",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-photoresistor-sensor", "id": "ldr1", "top": -140, "left": -260, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot1", "top": -10, "left": -270, "attrs": {} },
+    { "type": "wokwi-dht22", "id": "dht1", "top": -120, "left": 230, "attrs": { "temperature": "35" } },
+    { "type": "wokwi-slide-switch", "id": "sw1", "top": 120, "left": -230, "attrs": {} },
+    { "type": "wokwi-relay-module", "id": "rele1", "top": 230, "left": 230, "attrs": {} },
+    { "type": "wokwi-led", "id": "ledVerde", "top": 220, "left": -200, "attrs": { "color": "green", "label": "SOLAR" } },
+    { "type": "wokwi-led", "id": "ledAmarelo", "top": 220, "left": -140, "attrs": { "color": "yellow", "label": "BATERIA" } },
+    { "type": "wokwi-led", "id": "ledVermelho", "top": 220, "left": -80, "attrs": { "color": "red", "label": "REDE" } },
+    { "type": "wokwi-led", "id": "ledAzul", "top": 200, "left": 420, "attrs": { "color": "blue", "label": "CARREGANDO" } },
+    { "type": "wokwi-resistor", "id": "r1", "top": 300, "left": -210, "rotate": 90, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r2", "top": 300, "left": -150, "rotate": 90, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r3", "top": 300, "left": -90, "rotate": 90, "attrs": { "value": "220" } },
+    { "type": "wokwi-resistor", "id": "r4", "top": 280, "left": 410, "rotate": 90, "attrs": { "value": "220" } },
+    { "type": "wokwi-buzzer", "id": "bz1", "top": 100, "left": 330, "attrs": { "volume": "0.2" } },
+    { "type": "wokwi-lcd1602", "id": "lcd1", "top": -260, "left": 20, "attrs": { "pins": "i2c" } }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+
+    [ "ldr1:VCC", "esp:3V3", "red", [] ],
+    [ "ldr1:GND", "esp:GND.1", "black", [] ],
+    [ "ldr1:AO", "esp:34", "orange", [] ],
+
+    [ "pot1:VCC", "esp:3V3", "red", [] ],
+    [ "pot1:GND", "esp:GND.1", "black", [] ],
+    [ "pot1:SIG", "esp:35", "purple", [] ],
+
+    [ "dht1:VCC", "esp:3V3", "red", [] ],
+    [ "dht1:GND", "esp:GND.2", "black", [] ],
+    [ "dht1:SDA", "esp:15", "green", [] ],
+
+    [ "sw1:1", "esp:GND.1", "black", [] ],
+    [ "sw1:2", "esp:4", "blue", [] ],
+
+    [ "rele1:VCC", "esp:5V", "red", [] ],
+    [ "rele1:GND", "esp:GND.2", "black", [] ],
+    [ "rele1:IN", "esp:26", "orange", [] ],
+    [ "rele1:COM", "esp:3V3", "red", [] ],
+    [ "rele1:NO", "ledAzul:A", "blue", [] ],
+    [ "ledAzul:C", "r4:1", "black", [] ],
+    [ "r4:2", "esp:GND.2", "black", [] ],
+
+    [ "ledVerde:A", "esp:25", "green", [] ],
+    [ "ledVerde:C", "r1:1", "black", [] ],
+    [ "r1:2", "esp:GND.1", "black", [] ],
+    [ "ledAmarelo:A", "esp:33", "gold", [] ],
+    [ "ledAmarelo:C", "r2:1", "black", [] ],
+    [ "r2:2", "esp:GND.1", "black", [] ],
+    [ "ledVermelho:A", "esp:32", "red", [] ],
+    [ "ledVermelho:C", "r3:1", "black", [] ],
+    [ "r3:2", "esp:GND.1", "black", [] ],
+
+    [ "bz1:1", "esp:GND.2", "black", [] ],
+    [ "bz1:2", "esp:27", "orange", [] ],
+
+    [ "lcd1:GND", "esp:GND.2", "black", [] ],
+    [ "lcd1:VCC", "esp:5V", "red", [] ],
+    [ "lcd1:SDA", "esp:21", "green", [] ],
+    [ "lcd1:SCL", "esp:22", "purple", [] ]
+  ],
+  "dependencies": {}
+}

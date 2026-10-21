@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoltStation · Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --card: #131a22;
+    --line: #223040;
+    --text: #e6edf3;
+    --muted: #7d8b99;
+    --solar: #f5b301;
+    --bateria: #3ddc97;
+    --rede: #ff5c5c;
+    --espera: #7d8b99;
+    --protecao: #ff2e88;
+    --azul: #4aa8ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px 40px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo .raio {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--solar), #ff8a00);
+    display: grid; place-items: center; font-size: 22px; font-weight: 700; color: #111;
+  }
+  .logo h1 { font-size: 24px; letter-spacing: -0.5px; }
+  .logo p { font-size: 13px; color: var(--muted); }
+
+  .status {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    background: var(--card); border: 1px solid var(--line);
+    padding: 8px 12px; border-radius: 999px;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--rede); }
+  .dot.on { background: var(--bateria); box-shadow: 0 0 10px var(--bateria); }
+  .dot.demo { background: var(--solar); box-shadow: 0 0 10px var(--solar); }
+  button {
+    font-family: inherit; font-size: 12px; cursor: pointer;
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px;
+  }
+  button:hover { color: var(--text); border-color: var(--muted); }
+
+  /* Modo atual */
+  .modo {
+    background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+    padding: 24px; margin-bottom: 16px;
+    display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center;
+    border-left: 6px solid var(--modo-cor, var(--espera));
+    transition: border-color .4s;
+  }
+  .modo small { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+  .modo .nome {
+    font-size: 44px; font-weight: 700; letter-spacing: -1px;
+    color: var(--modo-cor, var(--espera)); transition: color .4s;
+  }
+  .modo .desc { color: var(--muted); font-size: 15px; margin-top: 4px; }
+  .fluxo { display: flex; gap: 8px; flex-wrap: wrap; }
+  .fonte {
+    font-size: 13px; padding: 8px 14px; border-radius: 10px;
+    border: 1px solid var(--line); color: var(--muted); opacity: .45;
+  }
+  .fonte.ativa { opacity: 1; color: #111; font-weight: 700; }
+  .fonte.ativa[data-f="SOLAR"] { background: var(--solar); border-color: var(--solar); }
+  .fonte.ativa[data-f="BATERIA"] { background: var(--bateria); border-color: var(--bateria); }
+  .fonte.ativa[data-f="REDE"] { background: var(--rede); border-color: var(--rede); }
+
+  /* Cards */
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px;
+  }
+  .card .rot { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  .card .val { font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 600; }
+  .card .val span { font-size: 15px; color: var(--muted); margin-left: 4px; }
+  .barra { height: 8px; background: var(--line); border-radius: 99px; margin-top: 12px; overflow: hidden; }
+  .barra div { height: 100%; width: 0; border-radius: 99px; transition: width .5s; }
+
+  .verde .val { color: var(--bateria); }
+  .alerta { border-color: var(--protecao) !important; }
+  .alerta .val { color: var(--protecao); }
+
+  /* Graficos e log */
+  .duas { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  .card h3 { font-size: 15px; font-weight: 500; margin-bottom: 12px; }
+  .grafico { position: relative; height: 260px; }
+  #log { list-style: none; font-family: 'JetBrains Mono', monospace; font-size: 12px; max-height: 260px; overflow-y: auto; }
+  #log li { padding: 7px 0; border-bottom: 1px solid var(--line); display: flex; gap: 10px; }
+  #log li time { color: var(--muted); }
+
+  footer { margin-top: 24px; text-align: center; color: var(--muted); font-size: 12px; }
+
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+    .duas { grid-template-columns: 1fr; }
+    .modo { grid-template-columns: 1fr; }
+    .modo .nome { font-size: 34px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">
+      <div class="raio">V</div>
+      <div>
+        <h1>VoltStation</h1>
+        <p>Recarga solar inteligente · Desafio GoodWe · FIAP</p>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <div class="status"><div class="dot" id="dot"></div><span id="statusTxt">Conectando ao Wokwi...</span></div>
+      <button id="btnDemo">Modo demonstração</button>
+    </div>
+  </header>
+
+  <section class="modo" id="modoBox">
+    <div>
+      <small>Modo atual</small>
+      <div class="nome" id="modoNome">—</div>
+      <div class="desc" id="modoDesc">Aguardando dados do ESP32...</div>
+    </div>
+    <div class="fluxo">
+      <div class="fonte" data-f="SOLAR">Solar</div>
+      <div class="fonte" data-f="BATERIA">Bateria</div>
+      <div class="fonte" data-f="REDE">Rede</div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <div class="rot">Geração solar</div>
+      <div class="val" id="solar">0.0<span>kW</span></div>
+      <div class="barra"><div id="solarBar" style="background:var(--solar)"></div></div>
+    </div>
+    <div class="card">
+      <div class="rot">Bateria</div>
+      <div class="val" id="bateria">0<span>%</span></div>
+      <div class="barra"><div id="bateriaBar" style="background:var(--bateria)"></div></div>
+    </div>
+    <div class="card">
+      <div class="rot">Potência de recarga</div>
+      <div class="val" id="recarga">0.0<span>kW</span></div>
+      <div class="barra"><div id="recargaBar" style="background:var(--azul)"></div></div>
+    </div>
+    <div class="card" id="tempCard">
+      <div class="rot">Temperatura do carregador</div>
+      <div class="val" id="temp">0<span>°C</span></div>
+      <div class="barra"><div id="tempBar" style="background:var(--rede)"></div></div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="card verde">
+      <div class="rot">CO₂ evitado</div>
+      <div class="val" id="co2">0.00<span>kg</span></div>
+    </div>
+    <div class="card verde">
+      <div class="rot">Energia limpa entregue</div>
+      <div class="val" id="energia">0.00<span>kWh</span></div>
+    </div>
+    <div class="card">
+      <div class="rot">Horário de pico</div>
+      <div class="val" id="pico">—</div>
+    </div>
+    <div class="card">
+      <div class="rot">Recarga com energia limpa</div>
+      <div class="val" id="pctLimpa">0<span>%</span></div>
+    </div>
+  </section>
+
+  <section class="duas">
+    <div class="card">
+      <h3>Geração solar × recarga do carro (kW)</h3>
+      <div class="grafico"><canvas id="grafico"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Histórico de decisões</h3>
+      <ul id="log"></ul>
+    </div>
+  </section>
+
+  <footer>Dados recebidos do ESP32 (Wokwi) via MQTT · broker.hivemq.com · tópico fiap/voltstation572949/telemetria</footer>
+</div>
+
+<script>
+  // ===== Configuração =====
+  const BROKER = 'wss://broker.hivemq.com:8884/mqtt';
+  const TOPICO = 'fiap/voltstation572949/telemetria';
+  const SOLAR_MAX = 7000, RECARGA_MAX = 7000, TEMP_MAX = 80;
+
+  const MODOS = {
+    SOLAR:    { cor: 'var(--solar)',    desc: 'Carregando com o excedente dos painéis solares.' },
+    BATERIA:  { cor: 'var(--bateria)',  desc: 'Horário de pico: carregando com a bateria para evitar a tarifa cara.' },
+    REDE:     { cor: 'var(--rede)',     desc: 'Sem sol e fora do pico: carregando com a rede (tarifa mais barata).' },
+    ESPERA:   { cor: 'var(--espera)',   desc: 'Horário de pico sem sol e bateria baixa: aguardando.' },
+    PROTECAO: { cor: 'var(--protecao)', desc: 'Temperatura alta! Carregador desligado por segurança.' }
+  };
+
+  const $ = id => document.getElementById(id);
+  let ultimoModo = null, leituras = 0, leiturasLimpas = 0;
+
+  // ===== Gráfico =====
+  const grafico = new Chart($('grafico'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Solar', data: [], borderColor: '#f5b301', backgroundColor: 'rgba(245,179,1,.12)', fill: true, tension: .35, pointRadius: 0 },
+        { label: 'Recarga', data: [], borderColor: '#4aa8ff', tension: .35, pointRadius: 0, borderWidth: 2 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { labels: { color: '#7d8b99' } } },
+      scales: {
+        x: { ticks: { color: '#7d8b99', maxTicksLimit: 6 }, grid: { color: '#1a2430' } },
+        y: { min: 0, max: 7.5, ticks: { color: '#7d8b99' }, grid: { color: '#1a2430' } }
+      }
+    }
+  });
+
+  // ===== Atualizar a tela =====
+  function atualizar(d) {
+    const m = MODOS[d.modo] || MODOS.ESPERA;
+    $('modoBox').style.setProperty('--modo-cor', m.cor);
+    $('modoNome').textContent = d.modo;
+    $('modoDesc').textContent = m.desc;
+    document.querySelectorAll('.fonte').forEach(f => f.classList.toggle('ativa', f.dataset.f === d.modo));
+
+    $('solar').innerHTML   = (d.solar_w / 1000).toFixed(1) + '<span>kW</span>';
+    $('bateria').innerHTML = d.bateria + '<span>%</span>';
+    $('recarga').innerHTML = (d.recarga_w / 1000).toFixed(1) + '<span>kW</span>';
+    $('temp').innerHTML    = d.temp.toFixed(1) + '<span>°C</span>';
+    $('co2').innerHTML     = d.co2_evitado_kg.toFixed(2) + '<span>kg</span>';
+    $('energia').innerHTML = d.energia_limpa_kwh.toFixed(2) + '<span>kWh</span>';
+    $('pico').textContent  = d.pico ? 'SIM' : 'NÃO';
+
+    $('solarBar').style.width   = Math.min(100, d.solar_w / SOLAR_MAX * 100) + '%';
+    $('bateriaBar').style.width = d.bateria + '%';
+    $('recargaBar').style.width = Math.min(100, d.recarga_w / RECARGA_MAX * 100) + '%';
+    $('tempBar').style.width    = Math.min(100, d.temp / TEMP_MAX * 100) + '%';
+    $('tempCard').classList.toggle('alerta', d.modo === 'PROTECAO');
+
+    if (d.recarga_w > 0) {
+      leituras++;
+      if (d.modo === 'SOLAR' || d.modo === 'BATERIA') leiturasLimpas++;
+    }
+    $('pctLimpa').innerHTML = (leituras ? Math.round(leiturasLimpas / leituras * 100) : 0) + '<span>%</span>';
+
+    const hora = new Date().toLocaleTimeString('pt-BR');
+    grafico.data.labels.push(hora);
+    grafico.data.datasets[0].data.push(d.solar_w / 1000);
+    grafico.data.datasets[1].data.push(d.recarga_w / 1000);
+    if (grafico.data.labels.length > 60) {
+      grafico.data.labels.shift();
+      grafico.data.datasets.forEach(ds => ds.data.shift());
+    }
+    grafico.update();
+
+    if (d.modo !== ultimoModo) {
+      const li = document.createElement('li');
+      li.innerHTML = `<time>${hora}</time><span style="color:${m.cor}">${d.modo}</span>`;
+      $('log').prepend(li);
+      ultimoModo = d.modo;
+    }
+  }
+
+  function status(txt, classe) {
+    $('statusTxt').textContent = txt;
+    $('dot').className = 'dot ' + (classe || '');
+  }
+
+  // ===== Conexão MQTT com o Wokwi =====
+  let demoTimer = null;
+  const cliente = mqtt.connect(BROKER, { clientId: 'voltdash-' + Math.random().toString(16).slice(2, 8) });
+  cliente.on('connect', () => { cliente.subscribe(TOPICO); if (!demoTimer) status('Conectado · aguardando ESP32', ''); });
+  cliente.on('message', (_, msg) => {
+    if (demoTimer) return;
+    try { atualizar(JSON.parse(msg.toString())); status('Recebendo dados do Wokwi', 'on'); } catch (e) {}
+  });
+  cliente.on('error', () => { if (!demoTimer) status('Erro de conexão', ''); });
+  cliente.on('offline', () => { if (!demoTimer) status('Sem conexão', ''); });
+
+  // ===== Modo demonstração (dados simulados, só para testar sem o Wokwi) =====
+  let t = 0, co2 = 0, energia = 0;
+  function passoDemo() {
+    t++;
+    const solar = Math.max(0, Math.sin(t / 25) * 7000);
+    const bateria = Math.round(50 + Math.sin(t / 40) * 45);
+    const pico = Math.sin(t / 25) < 0.2;
+    const temp = 35 + Math.sin(t / 15) * 8;
+    const exc = solar - 1000;
+    let modo, recarga;
+    if (exc >= 1400) { modo = 'SOLAR'; recarga = Math.min(exc, 7000); }
+    else if (pico && bateria > 30) { modo = 'BATERIA'; recarga = 3700; }
+    else if (!pico) { modo = 'REDE'; recarga = 7000; }
+    else { modo = 'ESPERA'; recarga = 0; }
+    if (modo === 'SOLAR' || modo === 'BATERIA') { const k = recarga / 1000 / 60; energia += k; co2 += k * 1.28; }
+    atualizar({ modo, solar_w: solar, bateria, recarga_w: recarga, temp, pico, energia_limpa_kwh: energia, co2_evitado_kg: co2 });
+  }
+  $('btnDemo').onclick = () => {
+    if (demoTimer) {
+      clearInterval(demoTimer); demoTimer = null;
+      $('btnDemo').textContent = 'Modo demonstração';
+      status(cliente.connected ? 'Conectado · aguardando ESP32' : 'Conectando ao Wokwi...', '');
+    } else {
+      demoTimer = setInterval(passoDemo, 1000);
+      $('btnDemo').textContent = 'Voltar ao Wokwi';
+      status('Modo demonstração (dados simulados)', 'demo');
+    }
+  };
+</script>
+</body>
+</html>
